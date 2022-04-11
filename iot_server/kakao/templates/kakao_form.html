@@ -1,0 +1,17 @@
+<div class="w-75 mx-auto">
+    <h1 class="my-3">Talk 보내기</h1> 
+    {% if messages %}
+        {% for msg in messages %}
+            <div class="alert alert-{{msg.level_tag}} " role="alert"> 
+            {{msg.message}}
+            </div> 
+        {% endfor %}
+    {% endif %}
+<form method="post"> 
+        {% csrf_token %} 
+        <table>
+            {{ form.as_table }} 
+        </table>
+        <input type="submit" value="보내기"> 
+</form>
+</div>

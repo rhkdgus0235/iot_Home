@@ -1,0 +1,15 @@
+<h1 class="my-3">카카오 토큰 정보</h1> 
+{% if token.error %}
+    <div>error:{{token.error}}</div>
+    <div>error_description:{{token.error_description}}</div>
+    <a href="javascript:history.back()" class="btn btn-primary">돌아가기</a>
+
+{% else %}
+    <div>access_token: {{token.access_token}}</div> 
+    <div>token_type: {{token.token_type}}</div> 
+    <div>scope: {{token.scope}}</div>
+    <div>expires_in: {{token.expires_in}}</div>
+    <div>refresh_token: {{token.refresh_token}}</div>
+    <div>refresh_token_expires_in: {{token.refresh_token_expires_in}}</div>
+
+{% endif %}
