@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<style>
+    #image{
+
+        max-width: 100%;
+    }
+</style>
+<body>
+    <div>
+    <a href="?mode=snapshot">스냅샷 보기</a>
+    <a href="?mode=stream">스트림 보기</a>
+    </div>
+    <br>
+    {% if mode == '#' %}
+        <img id="image">
+    {% elif mode == "snapshot" %}
+        <img id="image" src="{%url 'snapshot'%}">
+    {% elif mode == "stream" %}
+        <img id="image" src="{%url 'stream'%}">
+    {% endif %}
+        
+</body>
+</html>
