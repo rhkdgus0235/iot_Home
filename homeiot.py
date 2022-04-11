@@ -10,12 +10,16 @@ from gpiozero import LED,Servo,Button
 from pydub import AudioSegment
 from pydub.playback import play
 import sys
+from datetime import datetime
 
 # 클래스화는 다음에 할게요 
 
 button=Button(21,bounce_time=0.07)
 servo=Servo(19,min_pulse_width=0.0004,max_pulse_width=0.0024)
 red=LED(16)
+now=datetime.now()
+ampm = now.strftime('%p')
+
 
 def recognize():
     global is_success,result
@@ -136,7 +140,7 @@ while True:
         print('인식결과',result['value'])
         print(type(result['value']))
 
-        if(result['value']=="문 열어"):
+        if(result['value']=="문 열어" or result['value']=="문 열어줘" or result['value']=="문 좀 열어" or result['value']=="문 좀 열어줘"):
             servo.min()
             sleep(1)
             
@@ -144,16 +148,16 @@ while True:
             # result['value']="초기화"
             # print(result['value'])
             
-        elif(result['value']=="문 닫아"):
+        elif(result['value']=="문 닫아" or result['value']=="문 닫아줘" or result['value']=="문 좀 닫아" or result['value']=="문 좀 닫아줘"):
             servo.max()
             sleep(1)
             
             print("문 닫을게요")
-        elif(result['value']=="전등 켜"):
+        elif(result['value']=="거실 불 켜" or result['value']=="거실 켜" or result['value']=="거실 불" or result['value']=="거실 불 좀 켜"):
             print("전등 킬게요")
             red.on()
             sleep(1)
-        elif(result['value']=="전등 꺼"):
+        elif(result['value']=="거실 불 꺼" or result['value']=="거실 꺼" or result['value']=="거실 불 좀 꺼"):
             print("전등 끌게요")
             red.off()
             sleep(1)
@@ -171,6 +175,23 @@ while True:
             sound=BytesIO(res_sound.content)
             song=AudioSegment.from_mp3(sound)
             play(song)
+
+        elif(result['value']=="시간 알려줘"):
+            ampm_kr = '오전' if ampm == 'AM' else '오후'
+            print(ampm_kr)
+            if now.hour>12:
+                time_now=now.hour-12
+            text=f'''현재 시간은 {ampm_kr}  {time_now}시 {now.minute}분입니다.
+            '''
+            print(text)
+            
+            data=make_text(text)
+            res_sound=requests.post(URL,headers=HEADERS,data=data.encode('utf-8'))
+
+            sound=BytesIO(res_sound.content)
+            song=AudioSegment.from_mp3(sound)
+            play(song)
+            
 
         elif(result['value']=="종료해"):
             break
