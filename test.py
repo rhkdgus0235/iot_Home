@@ -34,7 +34,7 @@ def send_talk(text,mobile_web_url,web_url=None):
 def motion_detect():
     led.on()
     # res=send_talk('침입 발생','http://192.168.219.105:8000/mjpeg/?mode=stream')
-    res=send_talk('목욕 물이 채워졌습니다. 좋은 시간 되세요.','http://www.youtube.com/watch?v=VBFmh3nCZbc')
+    res=send_talk('목욕 물이 채워졌습니다. 좋은 시간 되세요.','http://www.youtube.com')
     # 라파 주소
     if res.get('result_code')!=0:
         print("전송 실패",res['msg'],res['code'])
