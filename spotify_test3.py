@@ -1,3 +1,4 @@
+from http import client
 import spotipy 
 from spotipy.oauth2 import SpotifyClientCredentials 
 import pprint 
@@ -6,8 +7,8 @@ class Spotify_audio_features:
         # initial setting 
         cid = 'fbb5700daf9a431ba8e4130b6b2e1a90' 
         secret = 'a16b2910bc2644f1a95de6a88356f23d' 
-        client_credentials_manager = SpotifyClientCredentials(client_id=cid, client_secret=secret) 
-        self.sp = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
+        # client_credentials_manager = SpotifyClientCredentials(client_id=cid, client_secret=secret) 
+        self.sp = spotipy.Spotify(auth_manager=spotipy.SpotifyOAuth(client_id=cid,client_secret=secret,redirect_uri="https://api-university.com/"))
 
     def get_features(self, song): 
         # get track id information 
