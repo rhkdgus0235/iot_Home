@@ -35,9 +35,11 @@ client=mqtt.Client()
 client.on_connect=on_connect
 client.on_message=on_message
 
+
 try:
-    client.connect("192.168.219.109")  #pc주소입력해야함
+    client.connect("192.168.219.104")  #pc주소입력해야함
     client.loop_forever()
+    
 
 except Exception as e:
     print(f'에러:{e}')

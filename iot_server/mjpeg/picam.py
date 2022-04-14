@@ -2,6 +2,11 @@ import io
 import time
 import numpy as np
 from picamera import PiCamera
+from haardetect import Haardetect
+import cv2
+
+cascade_file='haarcascade_frontalface_alt.xml'
+detector=Haardetect(cascade_file)
 
 class PiCam:
     def __init__(self,framerate=25,width=640,height=480):
@@ -32,5 +37,11 @@ class MJpegStreamCam(PiCam):
                    b'Content-Length: '+f"{len(image)}".encode()+b'\n'
                    b'\n'+image+b'\n')
 
+
+            # image_conv=cv2.imdecode(image,cv2.IMREAD_COLOR)
+            # face_list=detector.detect(image_conv)
+            # if len(face_list)>0:
+            #     detector.draw_rect(image_conv,face_list)
+            # print(type(image))
             frame.seek(0)
             frame.truncate()
