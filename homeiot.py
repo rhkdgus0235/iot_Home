@@ -26,6 +26,8 @@ button=Button(21,bounce_time=0.07)
 # servo=Servo(19,min_pulse_width=0.0004,max_pulse_width=0.0024)
 angle_servo=AngularServo(19, min_angle=-90, max_angle=90, min_pulse_width=0.0004, max_pulse_width=0.0024)
 red=LED(16)
+green=LED(13)
+blue=LED(26)
 now=datetime.now()
 ampm = now.strftime('%p')
 
@@ -147,19 +149,38 @@ def on_connect(client,userdata,flags,rc):
 def on_message(client,userdata,msg):
     print(msg.topic)
     value=msg.payload.decode()
-    if (value=="on" or value=="off"):
-        if (value=="on"):
-            print('led를 키겠습니다')
+    if (value=="livingroom_on" or value=="livingroom_off" or value=="kitchen_on" or value=="kitchen_off" or value=="mainroom_on" or value=="mainroom_off"):
+        if (value=="livingroom_on"):
+            print('거실led를 키겠습니다')
             red.on()
-        elif(value=="off"):
-            print("led를 끄겠습니다")
+        elif(value=="livingroom_off"):
+            print("거실led를 끄겠습니다")
             red.off()
+        elif(value=="kitchen_on"):
+            print("주방led를 키겠습니다")
+            green.on()
+        elif(value=="kitchen_off"):
+            print("주방led를 끄겠습니다")
+            green.off()
+        elif(value=="mainroom_on"):
+            print("안방led를 끄겠습니다")
+            blue.on()
+        elif(value=="mainroom_off"):
+            print("안방led를 끄겠습니다")
+            blue.off()
+        
         # print(f"{float(value)}")  #카메라각도값 제어
         print(f"{msg.topic} {value}")
     
     else:
-        angle_servo.angle=float(value)
-        print(f"{msg.topic} {value}")
+        if(msg.topic=="iot/blind"):
+            print("블라각 제어")
+            angle_servo.angle=float(value)
+            print(f"{msg.topic} {value}")
+        elif(msg.topic=="iot/camera/angle"):
+            print("카메라각 제어")
+            angle_servo.angle=float(value)
+            print(f"{msg.topic} {value}")
 
 client=mqtt.Client()
 
@@ -230,13 +251,13 @@ def readadc(adcnum):
 def sensor_data():
     
     while True:
-        if i==5:
-            return
+        
         pot_value0 = readadc(pot_channel0)
         print(pot_value0)
         if pot_value0>700:
             bath_water_detect()
-            i+=1
+            sleep(295)
+            
             
         sleep(5)
 
