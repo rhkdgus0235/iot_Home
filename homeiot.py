@@ -17,7 +17,9 @@ import threading
 import paho.mqtt.client as mqtt
 from gpiozero import AngularServo
 import spidev
-
+from AnalogSpi import AnalogSpi
+from FireAlert import FireAlert
+from ShadesControl import ShadesControl
 
 
 # 클래스화는 다음에 할게요 
@@ -206,43 +208,66 @@ def bath_water_detect():
 #카톡연동
 
 
-# 딜레이 시간(센서 측정 간격)
-delay = 0.5
-# MCP3008 채널 중 센서에 연결한 채널 설정
-pot_channel0 = 0
+# # 딜레이 시간(센서 측정 간격)
+# delay = 0.5
+# # MCP3008 채널 중 센서에 연결한 채널 설정
+# pot_channel0 = 0
 
-# SPI 인스턴스 spi 생성
-spi = spidev.SpiDev()
-# SPI 통신 시작하기
-spi.open(0, 0)
-# SPI 통신 속도 설정
-spi.max_speed_hz = 100000
-# 0 ~7 까지 8개의 채널에서 SPI 데이터 읽기
-def readadc(adcnum):
-    if adcnum < 0 or adcnum > 7:
-        return -1
-    r = spi.xfer2([1, 8+adcnum <<4, 0])
-    data = ((r[1] & 3) << 8) + r[2]
-    return data
+# # SPI 인스턴스 spi 생성
+# spi = spidev.SpiDev()
+# # SPI 통신 시작하기
+# spi.open(0, 0)
+# # SPI 통신 속도 설정
+# spi.max_speed_hz = 100000
+# # 0 ~7 까지 8개의 채널에서 SPI 데이터 읽기
+# def readadc(adcnum):
+#     if adcnum < 0 or adcnum > 7:
+#         return -1
+#     r = spi.xfer2([1, 8+adcnum <<4, 0])
+#     data = ((r[1] & 3) << 8) + r[2]
+#     return data
 
 #물높이 센서(spi)
 
-def sensor_data():
+# def sensor_data():
     
+#     while True:
+#         if i==5:
+#             return
+#         pot_value0 = readadc(pot_channel0)
+#         print(pot_value0)
+#         if pot_value0>700:
+# #센서값을 통한 카톡메세지 전달
+#             bath_water_detect()
+#             i+=1
+            
+#         sleep(5)
+
+
+def analog_sensors():
+    i=0
+    analog_spi=AnalogSpi()
+    shades_control=ShadesControl()
+    fire_alert=FireAlert()
+
     while True:
+        
+        pot_value0 = analog_spi.readadc(analog_spi.pot_channel0)
+        pot_value1 = analog_spi.readadc(analog_spi.pot_channel1)
+        pot_value2 = analog_spi.readadc(analog_spi.pot_channel2)
+        
+        fire_alert.run(pot_value0)
+        shades_control.run(pot_value1)
+
         if i==5:
             return
-        pot_value0 = readadc(pot_channel0)
-        print(pot_value0)
-        if pot_value0>700:
+        print(pot_value2)
+        if pot_value2>700:
+#센서값을 통한 카톡메세지 전달
             bath_water_detect()
             i+=1
             
-        sleep(5)
-
-
-#센서값을 통한 카톡메세지 전달
-
+        sleep(2)
 
 
 
@@ -252,7 +277,7 @@ while True:
         
         # pot_value0_th=threading.Thread(target=readadc,args=(pot_channel0,))
         # pot_value0_th.start()
-        t=threading.Thread(target=sensor_data,args=())
+        t=threading.Thread(target=analog_sensors,args=())
         
         t.start()
         # pot_value0_th.start()
