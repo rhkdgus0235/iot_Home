@@ -291,7 +291,7 @@ def analog_sensors():
         print(pot_value2)
         if pot_value2>680:
             bath_water_detect()
-            sleep(0.295)
+            sleep(295)
             
         sleep(2)
 
