@@ -242,14 +242,32 @@ def send_talk(text,mobile_web_url,web_url=None):
     talk_url = "https://kapi.kakao.com/v2/api/talk/memo/default/send"
     header={"Authorization":f"Bearer {token}"}
 
+    # text_template={
+    #     'object_type':'text',
+    #     'text':text,
+    #     'image_url': "http://mud-kage.kakao.co.kr/dn/NTmhS/btqfEUdFAUf/FjKzkZsnoeE4o19klTOVI1/openlink_640x640s.jpg",
+    #     'link':{
+    #         'web_url':web_url,
+    #         'mobile_web_url':mobile_web_url
+    #         }
+    # }
     text_template={
-        'object_type':'text',
-        'text':text,
-        'link':{
-            'web_url':web_url,
-            'mobile_web_url':mobile_web_url
-            }
+        'object_type':'feed',
+        "content": {
+            "title": "즐거운 시간",
+            "description": text, 
+            "image_url": "https://c.pxhere.com/photos/02/7b/hammocks_trees_summer_relaxation_resort_relax_holiday_tranquil-947005.jpg!d", "image_width": 640,
+            "image_height": 640, 
+            "link": {
+            "web_url": web_url,
+            "mobile_web_url": mobile_web_url,
+            "android_execution_params": "contentId=100", "ios_execution_params": "contentId=100"
+        } 
+        }
+        
     }
+
+
     print(text_template)
     payload={'template_object':json.dumps(text_template)}
     res=requests.post(talk_url,data=payload,headers=header)
@@ -293,7 +311,7 @@ def sensor_data():
     while True:
         
         pot_value0 = readadc(pot_channel0)
-        print(pot_value0)
+        print("수위값:"+pot_value0)
         if pot_value0>680:
             bath_water_detect()
             sleep(295)
