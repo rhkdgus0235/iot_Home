@@ -4,7 +4,7 @@ import time
 delay = 0.5
 # MCP3008 채널 중 센서에 연결한 채널 설정
 pot_channel0 = 0
-pot_channel1 = 1
+pot_channel2 = 2
 # SPI 인스턴스 spi 생성
 spi = spidev.SpiDev()
 # SPI 통신 시작하기
@@ -21,9 +21,9 @@ def readadc(adcnum):
 while True:
   # readadc 함수로 pot_channel의 SPI 데이터를 읽기
   pot_value0 = readadc(pot_channel0)
-  pot_value1 = readadc(pot_channel1)
+  pot_value2 = readadc(pot_channel2)
   print("---------------------------")
   print(f"photo resiter value: {pot_value0}" ) 
-  print(f"LDR value: {pot_value1}") 
+  print(f"LDR value: {pot_value2}") 
 #   print(time.time())
   time.sleep(delay)

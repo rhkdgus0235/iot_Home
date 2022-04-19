@@ -6,7 +6,7 @@ import json
 import sounddevice as sd
 import soundfile as sf
 from io import BytesIO
-from gpiozero import LED,Servo,Button
+from gpiozero import LED,Servo,Button,PWMLED
 from pydub import AudioSegment
 from pydub.playback import play
 import sys
@@ -27,7 +27,9 @@ dhtdevice=adafruit_dht.DHT11(board.D12)
 button=Button(21,bounce_time=0.07)
 # servo=Servo(19,min_pulse_width=0.0004,max_pulse_width=0.0024)
 angle_servo=AngularServo(19, min_angle=-90, max_angle=90, min_pulse_width=0.0004, max_pulse_width=0.0024)
-red=LED(16)
+red=PWMLED(16)
+green=PWMLED(13)
+blue=PWMLED(26)
 now=datetime.now()
 ampm = now.strftime('%p')
 
@@ -137,6 +139,14 @@ def make_text(text,name="MAN_READ_CALM"):
 
 # 음성합성
 
+living_true=0
+kitchen_true=0
+mainroom_true=0
+listI=[]
+for i in range(0,101):
+    listI.append(i)
+
+listS=list(map(str,listI))
 
 def on_connect(client,userdata,flags,rc):
     print("Connected with result code"+str(rc))
@@ -147,21 +157,72 @@ def on_connect(client,userdata,flags,rc):
 
 
 def on_message(client,userdata,msg):
+    global living_true,kitchen_true,mainroom_true
     print(msg.topic)
+    mt=msg.topic
+    
     value=msg.payload.decode()
-    if (value=="on" or value=="off"):
-        if (value=="on"):
-            print('led를 키겠습니다')
-            red.on()
-        elif(value=="off"):
-            print("led를 끄겠습니다")
+    if (mt=="iot/led/livingroom" or mt=="iot/led/kitchen" or mt=="iot/led/mainroom"):
+        if (mt=="iot/led/livingroom" and value=="on"):
+            print('거실led를 키겠습니다')
+            
+            living_true=1
+            red.value=0.5
+            
+        elif(mt=="iot/led/livingroom" and value=="off"):
+            print("거실led를 끄겠습니다")
+            living_true=0
             red.off()
+        elif(mt=="iot/led/kitchen" and value=="on"):
+            print("주방led를 키겠습니다")
+            kitchen_true=1
+            green.value=0.5
+        elif(mt=="iot/led/kitchen" and value=="off"):
+            print("주방led를 끄겠습니다")
+            kitchen_true=0
+            green.off()
+        elif(mt=="iot/led/mainroom" and value=="on"):
+            print("안방led를 끄겠습니다")
+            mainroom_true=1
+            blue.value=0.5
+        elif(mt=="iot/led/mainroom" and value=="off"):
+            print("안방led를 끄겠습니다")
+            mainroom_true=0
+            blue.off()
+        elif(living_true==1 and mt=="iot/led/livingroom"):
+            
+            if (value in listS):
+                print(living_true)
+                print(float(int(value)/100))
+                red.value=float(int(value)/100)
+        elif(kitchen_true==1 and mt=="iot/led/kitchen"):
+            
+            if (value in listS):
+                print(kitchen_true)
+                print(float(int(value)/100))
+                green.value=float(int(value)/100)
+        
+        elif(mainroom_true==1 and mt=="iot/led/mainroom"):
+            
+            if (value in listS):
+                print(mainroom_true)
+                print(float(int(value)/100))
+                blue.value=float(int(value)/100)
+
+
+
         # print(f"{float(value)}")  #카메라각도값 제어
         print(f"{msg.topic} {value}")
     
     else:
-        angle_servo.angle=float(value)
-        print(f"{msg.topic} {value}")
+        if(msg.topic=="iot/blind"):
+            print("블라각 제어")
+            angle_servo.angle=float(value)
+            print(f"{msg.topic} {value}")
+        elif(msg.topic=="iot/camera/angle"):
+            print("카메라각 제어")
+            angle_servo.angle=float(value)
+            print(f"{msg.topic} {value}")
 
 client=mqtt.Client()
 
@@ -209,7 +270,7 @@ def bath_water_detect():
 
 # 아날로그 센서 
 def analog_sensors():
-    i=0
+    
     analog_spi=AnalogSpi()
     shades_control=ShadesControl() #서보모터의 gpio 핀은 기본 22로 설정되어있음
     fire_alert=FireAlert()
@@ -227,13 +288,10 @@ def analog_sensors():
         shades_control.run(pot_value1)
 
         # 물높이
-        if i==5:
-            return
         print(pot_value2)
-        if pot_value2>700:
-            #센서값을 통한 카톡메세지 전달
+        if pot_value2>680:
             bath_water_detect()
-            i+=1
+            sleep(0.295)
             
         sleep(2)
 
@@ -281,6 +339,25 @@ while True:
             print("전등 끌게요")
             red.off()
             sleep(1)
+
+        elif(result['value']=="주방 불 켜" or result['value']=="주방 켜" or result['value']=="주방 불" or result['value']=="주방 불 좀 켜"):
+            print("전등 킬게요")
+            green.on()
+            sleep(1)
+        elif(result['value']=="주방 불 꺼" or result['value']=="주방 꺼" or result['value']=="주방 불 좀 꺼"):
+            print("전등 끌게요")
+            green.off()
+            sleep(1)
+
+        elif(result['value']=="안방 불 켜" or result['value']=="안방 켜" or result['value']=="안방 불" or result['value']=="안방 불 좀 켜"):
+            print("전등 킬게요")
+            blue.on()
+            sleep(1)
+        elif(result['value']=="안방 불 꺼" or result['value']=="안방 꺼" or result['value']=="안방 불 좀 꺼"):
+            print("전등 끌게요")
+            blue.off()
+            sleep(1)
+
 
         elif(result['value']=="날씨 알려줘"):
             text=f'''오늘 날씨는 {weather["description"]} 최저온도는 {round(float(weather["etc"]["temp_min"]-273),1)} 도
