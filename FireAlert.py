@@ -17,14 +17,15 @@
 # 고작 불꽃감지에 계산너무많이쓰나..?그치만 정수 계산 몇번인데 괜찮지않을까 아니그래도 while문에넣으니까 계속할텐데.. 음..
 
 import sys
-
+from gpiozero import Buzzer
 
 class FireAlert:
-  def __init__(self):
+  def __init__(self,buzzer_pin=5):
     self.average= 1015
     self.sum=0
     self.count=0
     self.danger_count =0
+    self.bz=Buzzer(buzzer_pin)
     
 
   def run(self, sensor_value):
@@ -40,6 +41,9 @@ class FireAlert:
       self.danger_count +=1
 
     else:
+      # 위험값이 아닌거 같으면 부저 끈다
+      if self.bz.is_active:
+        self.bz.off()
       self.danger_count =0
       
       # 위험값이 아닌거 같으면 평균에 포함
@@ -66,6 +70,8 @@ class FireAlert:
 
   def send_alert(self):
     print("!!!!!!!불꽃감지 알림작동!!!!!!!!")
+    if not self.bz.is_active:
+      self.bz.on()
     
 
 
