@@ -17,8 +17,8 @@ import threading
 import paho.mqtt.client as mqtt
 from gpiozero import AngularServo
 import spidev
-
-
+import os
+import cv2
 
 # 클래스화는 다음에 할게요 
 dhtdevice=adafruit_dht.DHT11(board.D12)
@@ -30,6 +30,47 @@ green=PWMLED(13)
 blue=PWMLED(26)
 now=datetime.now()
 ampm = now.strftime('%p')
+
+cap=cv2.VideoCapture(1)
+# fname=start.strftime('./data/%Y%m%d_%H%M%S.mp4')
+frame_size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+
+fourcc=cv2.VideoWriter_fourcc(*'mp4v')
+writer=None
+
+
+def start_record():
+    global writer
+    if writer: return
+    start=datetime.now()
+    fname=start.strftime('./data/%Y%m%d_%H%M%S.mp4')
+    writer=cv2.VideoWriter(fname,fourcc,20.0,frame_size)
+    print('frame_size = ', frame_size)
+
+def stop_record():
+    global writer
+    if not writer:return
+
+    writer.release()
+    writer=None
+    print('stop recording')
+
+thread_state = True
+retval,frame=cap.read()
+def record_thread():
+    
+    while thread_state:
+        start_record()
+
+        
+        if writer:
+            writer.write(frame)
+
+    stop_record()
+    sleep(2)
+    
+
 
 
 def recognize():
@@ -140,6 +181,7 @@ def make_text(text,name="MAN_READ_CALM"):
 living_true=0
 kitchen_true=0
 mainroom_true=0
+automode_true=1
 listI=[]
 for i in range(0,101):
     listI.append(i)
@@ -155,7 +197,7 @@ def on_connect(client,userdata,flags,rc):
 
 
 def on_message(client,userdata,msg):
-    global living_true,kitchen_true,mainroom_true
+    global living_true,kitchen_true,mainroom_true, thread_state,automode_true
     print(msg.topic)
     mt=msg.topic
     
@@ -213,14 +255,40 @@ def on_message(client,userdata,msg):
         print(f"{msg.topic} {value}")
     
     else:
-        if(msg.topic=="iot/blind"):
-            print("블라각 제어")
-            angle_servo.angle=float(value)
-            print(f"{msg.topic} {value}")
+        if(msg.topic=="iot/blind" and value=="automode_on"):
+            automode_true=1
+
+        elif(msg.topic=="iot/blind" and value=="automode_off"):
+            automode_true=0
         elif(msg.topic=="iot/camera/angle"):
             print("카메라각 제어")
             angle_servo.angle=float(value)
             print(f"{msg.topic} {value}")
+        elif(msg.topic=="iot/camera/capture" and value=="captured"):
+            print("내부카메라 캡쳐 ")
+            # os.system("fswebcam --device /dev/video1 image.jpeg")
+            cv2.imwrite('messigray.png',frame, params=[cv2.IMWRITE_PNG_COMPRESSION,0])
+        elif(msg.topic=="iot/camera/record" and value=="on"):
+            
+            print("내부카메라 녹화")
+            t_record=threading.Thread(target=record_thread,args=())
+            t_record.start()
+            
+            # cv2.imshow('frame',frame)
+
+            
+        elif (msg.topic=="iot/camera/record" and value=="off"):
+            print("내부카메라 녹화종료")
+            # t_record=threading.Thread(target=record_thread,args=(1,))
+            # t_record.start()
+            thread_state = False
+        elif (automode_true==0 and mt=="iot/blind"):
+            if (value in listS):
+                print("블라각 제어")
+                angle_servo.angle=float(value)
+                print(f"{msg.topic} {value}")
+
+
 
 client=mqtt.Client()
 
@@ -276,7 +344,7 @@ def send_talk(text,mobile_web_url,web_url=None):
 def bath_water_detect():
     red.on()
     # res=send_talk('침입 발생','http://192.168.219.105:8000/mjpeg/?mode=stream')
-    res=send_talk('목욕 물이 채워졌습니다. 좋은 시간 되세요.','http://www.youtube.com/watch?v=VBFmh3nCZbc')
+    res=send_talk('목욕 물이 채워졌습니다. 좋은 시간 되세요.','http://www.youtube.com/watch?v=VBFmh3nCZbc')#카카오톡 개발자 사이트에서 youtube.com 등록
     # 라파 주소
     if res.get('result_code')!=0:
         print("전송 실패",res['msg'],res['code'])
@@ -311,7 +379,7 @@ def sensor_data():
     while True:
         
         pot_value0 = readadc(pot_channel0)
-        print("수위값:"+pot_value0)
+        print("수위값:", pot_value0)
         if pot_value0>680:
             bath_water_detect()
             sleep(295)
@@ -334,6 +402,7 @@ while True:
         t=threading.Thread(target=sensor_data,args=())
         
         t.start()
+        
         # pot_value0_th.start()
         
         # print(pot_value0)
@@ -341,7 +410,7 @@ while True:
         #     t=threading.Thread(target=bath_water_detect)
         #     t.start()
         #     sleep(2)
-        client.connect("192.168.219.104")  #pc주소입력해야함
+        client.connect("192.168.219.105")  #pc주소입력해야함
         client.loop_start()
     
 
@@ -459,7 +528,7 @@ while True:
         elif(result['value']=="종료해"):
             break
 
-        elif(result['value']!="문 열어" or result['value']!="문 닫아" or result['value']!="전등 켜" or result['value']!="전등 꺼" or result['value']!="날씨 알려줘" or result['value']!="종료해"):
+        elif(result['value']!="창문 열어" or result['value']!="창문 닫아" or result['value']!="전등 켜" or result['value']!="전등 꺼" or result['value']!="날씨 알려줘" or result['value']!="종료해"):
             # result['value']="초기화"
             
             text=f'''죄송합니다 다시 말씀해주세요
