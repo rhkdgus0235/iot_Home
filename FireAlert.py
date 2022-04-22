@@ -17,11 +17,41 @@
 # 고작 불꽃감지에 계산너무많이쓰나..?그치만 정수 계산 몇번인데 괜찮지않을까 아니그래도 while문에넣으니까 계속할텐데.. 음..
 
 import sys
+from gpiozero import Buzzer
+import time
+import requests
+import json
+# from homeiot import send_talk_alert
+bz=Buzzer(17)
 
+key_path='/home/pi/workspace/iot_Home-2/iot_server/access_token.txt'
+
+def send_talk_alert(text,mobile_web_url,web_url=None):
+    if not web_url:
+        web_url=mobile_web_url
+    with open(key_path,'r') as f:
+        token=f.read()
+
+    talk_url = "https://kapi.kakao.com/v2/api/talk/memo/default/send"
+    header={"Authorization":f"Bearer {token}"}
+
+    text_template={
+        'object_type':'text',
+        'text':text,
+        # 'image_url': "http://mud-kage.kakao.co.kr/dn/NTmhS/btqfEUdFAUf/FjKzkZsnoeE4o19klTOVI1/openlink_640x640s.jpg",
+        'link':{
+            'web_url':web_url,
+            'mobile_web_url':mobile_web_url
+            }
+    }
+    print(text_template)
+    payload={'template_object':json.dumps(text_template)}
+    res=requests.post(talk_url,data=payload,headers=header)
+    return res.json()
 
 class FireAlert:
   def __init__(self):
-    self.average= 1015
+    self.average= 1
     self.sum=0
     self.count=0
     self.danger_count =0
@@ -36,7 +66,8 @@ class FireAlert:
 
     difference =self.average - sensor_value 
 
-    if difference > 25:
+    # if difference > 3:
+    if self.average > 3:
       self.danger_count +=1
 
     else:
@@ -66,6 +97,16 @@ class FireAlert:
 
   def send_alert(self):
     print("!!!!!!!불꽃감지 알림작동!!!!!!!!")
+    i=0
+    if i<3:
+      res=send_talk_alert('화재발생!!!!','http://192.168.219.106:8000/mjpeg/?mode=stream')#라파 서버주소
+      i+=1
+    # 라파 주소
+    if res.get('result_code')!=0:
+        print("전송 실패",res['msg'],res['code'])
+    for i in range(6):
+      bz.toggle()
+      time.sleep(1)
     
 
 

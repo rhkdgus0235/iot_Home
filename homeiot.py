@@ -19,7 +19,9 @@ from gpiozero import AngularServo
 import spidev
 import os
 import cv2
-
+from AnalogSpi import AnalogSpi
+from FireAlert import FireAlert
+from ShadesControl import ShadesControl
 # 클래스화는 다음에 할게요 
 dhtdevice=adafruit_dht.DHT11(board.D12)
 button=Button(21,bounce_time=0.07)
@@ -31,41 +33,47 @@ blue=PWMLED(26)
 now=datetime.now()
 ampm = now.strftime('%p')
 
-cap=cv2.VideoCapture(1)
+
 # fname=start.strftime('./data/%Y%m%d_%H%M%S.mp4')
-frame_size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+# frame_size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+# int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+frame_size = (640,480)
 
 fourcc=cv2.VideoWriter_fourcc(*'mp4v')
 writer=None
 
 
 def start_record():
-    global writer
+    global writer, thread_state
     if writer: return
+    thread_state = True
     start=datetime.now()
     fname=start.strftime('./data/%Y%m%d_%H%M%S.mp4')
     writer=cv2.VideoWriter(fname,fourcc,20.0,frame_size)
     print('frame_size = ', frame_size)
 
 def stop_record():
-    global writer
+    global writer, thread_state
     if not writer:return
 
     writer.release()
     writer=None
     print('stop recording')
 
-thread_state = True
-retval,frame=cap.read()
-def record_thread():
-    
-    while thread_state:
-        start_record()
+thread_state = False
 
-        
+def record_thread():
+    cap=cv2.VideoCapture(1)
+    start_record()
+    print("카메라 상태", cap.isOpened())
+
+    while thread_state:
+        retval, frame=cap.read()        
         if writer:
+            print(retval)
             writer.write(frame)
+        else:
+            print("writer 없음")
 
     stop_record()
     sleep(2)
@@ -257,6 +265,7 @@ def on_message(client,userdata,msg):
     else:
         if(msg.topic=="iot/blind" and value=="automode_on"):
             automode_true=1
+            # 여기하셔야 됩니다
 
         elif(msg.topic=="iot/blind" and value=="automode_off"):
             automode_true=0
@@ -266,6 +275,13 @@ def on_message(client,userdata,msg):
             print(f"{msg.topic} {value}")
         elif(msg.topic=="iot/camera/capture" and value=="captured"):
             print("내부카메라 캡쳐 ")
+            cap=cv2.VideoCapture(0)
+    
+    
+
+    
+            retval, frame=cap.read()  
+
             # os.system("fswebcam --device /dev/video1 image.jpeg")
             cv2.imwrite('messigray.png',frame, params=[cv2.IMWRITE_PNG_COMPRESSION,0])
         elif(msg.topic=="iot/camera/record" and value=="on"):
@@ -341,8 +357,31 @@ def send_talk(text,mobile_web_url,web_url=None):
     res=requests.post(talk_url,data=payload,headers=header)
     return res.json()
 
+def send_talk_alert(text,mobile_web_url,web_url=None):
+    if not web_url:
+        web_url=mobile_web_url
+    with open(key_path,'r') as f:
+        token=f.read()
+
+    talk_url = "https://kapi.kakao.com/v2/api/talk/memo/default/send"
+    header={"Authorization":f"Bearer {token}"}
+
+    text_template={
+        'object_type':'text',
+        'text':text,
+        # 'image_url': "http://mud-kage.kakao.co.kr/dn/NTmhS/btqfEUdFAUf/FjKzkZsnoeE4o19klTOVI1/openlink_640x640s.jpg",
+        'link':{
+            'web_url':web_url,
+            'mobile_web_url':mobile_web_url
+            }
+    }
+    print(text_template)
+    payload={'template_object':json.dumps(text_template)}
+    res=requests.post(talk_url,data=payload,headers=header)
+    return res.json()
+
 def bath_water_detect():
-    red.on()
+    # red.on()
     # res=send_talk('침입 발생','http://192.168.219.105:8000/mjpeg/?mode=stream')
     res=send_talk('목욕 물이 채워졌습니다. 좋은 시간 되세요.','http://www.youtube.com/watch?v=VBFmh3nCZbc')#카카오톡 개발자 사이트에서 youtube.com 등록
     # 라파 주소
@@ -374,24 +413,60 @@ def readadc(adcnum):
 
 #물높이 센서(spi)
 
-def sensor_data():
+# def sensor_data():
     
+#     while True:
+        
+#         pot_value0 = readadc(pot_channel0)
+#         print("수위값:", pot_value0)
+#         if pot_value0>680:
+#             bath_water_detect()
+#             sleep(295)
+            
+            
+#         sleep(5)
+def analog_sensors():
+    
+    analog_spi=AnalogSpi()
+    shades_control=ShadesControl() #서보모터의 gpio 핀은 기본 22로 설정되어있음
+    fire_alert=FireAlert()
+    i=0
     while True:
         
-        pot_value0 = readadc(pot_channel0)
-        print("수위값:", pot_value0)
-        if pot_value0>680:
+        pot_value0 = analog_spi.readadc(analog_spi.pot_channel0)
+        pot_value1 = analog_spi.readadc(analog_spi.pot_channel1)
+        pot_value2 = analog_spi.readadc(analog_spi.pot_channel2)
+
+        # 불꽃감지
+        fire_alert.run(pot_value0)
+
+        # 조도센서 블라인드 
+        shades_control.run(pot_value1)
+
+        # 물높이
+        
+        print("불꽃감지 값:",pot_value0)
+        
+        print("물높이:", pot_value2)
+        if pot_value2>600 and i==0:
             bath_water_detect()
-            sleep(295)
+            sleep(5)
+            i+=1
+
             
             
-        sleep(5)
+        sleep(2)
+
 
 
 #센서값을 통한 카톡메세지 전달
 
 
-
+t=threading.Thread(target=analog_sensors,args=())
+        
+t.start()
+client.connect("192.168.219.105")  #pc주소입력해야함
+client.loop_start()
 
 # button.when_pressed=recognize
 while True:
@@ -399,9 +474,7 @@ while True:
         
         # pot_value0_th=threading.Thread(target=readadc,args=(pot_channel0,))
         # pot_value0_th.start()
-        t=threading.Thread(target=sensor_data,args=())
         
-        t.start()
         
         # pot_value0_th.start()
         
@@ -410,8 +483,7 @@ while True:
         #     t=threading.Thread(target=bath_water_detect)
         #     t.start()
         #     sleep(2)
-        client.connect("192.168.219.105")  #pc주소입력해야함
-        client.loop_start()
+        print("시작하겟슴")
     
 
     except Exception as e:
