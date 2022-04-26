@@ -22,7 +22,7 @@ import time
 import requests
 import json
 # from homeiot import send_talk_alert
-bz=Buzzer(17)
+# bz=Buzzer(17)
 
 key_path='/home/pi/workspace/iot_Home-2/iot_server/access_token.txt'
 
@@ -50,11 +50,12 @@ def send_talk_alert(text,mobile_web_url,web_url=None):
     return res.json()
 
 class FireAlert:
-  def __init__(self):
-    self.average= 1
+  def __init__(self,buzzer_pin=17):
+    self.average= 1015
     self.sum=0
     self.count=0
     self.danger_count =0
+    self.bz=Buzzer(buzzer_pin)
     
 
   def run(self, sensor_value):
@@ -71,6 +72,9 @@ class FireAlert:
       self.danger_count +=1
 
     else:
+      # 위험값이 아닌거 같으면 부저 끈다
+      if self.bz.is_active:
+        self.bz.off()
       self.danger_count =0
       
       # 위험값이 아닌거 같으면 평균에 포함
@@ -105,9 +109,12 @@ class FireAlert:
     if res.get('result_code')!=0:
         print("전송 실패",res['msg'],res['code'])
     for i in range(6):
-      bz.toggle()
+      self.bz.toggle()
       time.sleep(1)
-    
+    if not self.bz.is_active:
+      self.bz.on()
+      
+      
 
 
 

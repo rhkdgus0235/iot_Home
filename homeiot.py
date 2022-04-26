@@ -22,6 +22,11 @@ import cv2
 from AnalogSpi import AnalogSpi
 from FireAlert import FireAlert
 from ShadesControl import ShadesControl
+
+
+
+
+
 # 클래스화는 다음에 할게요 
 dhtdevice=adafruit_dht.DHT11(board.D12)
 button=Button(21,bounce_time=0.07)
@@ -400,54 +405,20 @@ def bath_water_detect():
         print("전송 실패",res['msg'],res['code'])
 
 
-#카톡연동
 
 
-# 딜레이 시간(센서 측정 간격)
-delay = 0.5
-# MCP3008 채널 중 센서에 연결한 채널 설정
-pot_channel0 = 0
-
-# SPI 인스턴스 spi 생성
-spi = spidev.SpiDev()
-# SPI 통신 시작하기
-spi.open(0, 0)
-# SPI 통신 속도 설정
-spi.max_speed_hz = 100000
-# 0 ~7 까지 8개의 채널에서 SPI 데이터 읽기
-def readadc(adcnum):
-    if adcnum < 0 or adcnum > 7:
-        return -1
-    r = spi.xfer2([1, 8+adcnum <<4, 0])
-    data = ((r[1] & 3) << 8) + r[2]
-    return data
-
-#물높이 센서(spi)
-
-# def sensor_data():
-    
-#     while True:
-        
-#         pot_value0 = readadc(pot_channel0)
-#         print("수위값:", pot_value0)
-#         if pot_value0>680:
-#             bath_water_detect()
-#             sleep(295)
-            
-            
-#         sleep(5)
+# 아날로그 센서 
 def analog_sensors():
-    
-    analog_spi=AnalogSpi()
-    # shades_control=ShadesControl() #서보모터의 gpio 핀은 기본 22로 설정되어있음
-    fire_alert=FireAlert()
     i=0
+    analog_spi=AnalogSpi()
+    shades_control=ShadesControl() #서보모터의 gpio 핀은 기본 22로 설정되어있음
+    fire_alert=FireAlert()
+
     while True:
         
         pot_value0 = analog_spi.readadc(analog_spi.pot_channel0)
-        # pot_value1 = analog_spi.readadc(analog_spi.pot_channel1)
+        pot_value1 = analog_spi.readadc(analog_spi.pot_channel1)
         pot_value2 = analog_spi.readadc(analog_spi.pot_channel2)
-
         # 불꽃감지
         fire_alert.run(pot_value0)
 
@@ -463,10 +434,27 @@ def analog_sensors():
             bath_water_detect()
             sleep(5)
             i+=1
-
-            
-            
         sleep(2)
+# while True:
+#     try:
+
+#         t=threading.Thread(target=analog_sensors,args=())
+#         t.start()
+        
+#         client.connect("192.168.219.104")  #pc주소입력해야함
+#         client.loop_start()
+    
+
+#     except Exception as e:
+#         print(f'에러:{e}')
+
+
+#     button.wait_for_press()
+#     recognize()
+#     if is_success:
+#         print('인식결과',result['value'])
+#         print(type(result['value']))
+                 
 
 
 shade_state=True
