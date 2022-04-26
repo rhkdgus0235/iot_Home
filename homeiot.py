@@ -26,7 +26,8 @@ from ShadesControl import ShadesControl
 dhtdevice=adafruit_dht.DHT11(board.D12)
 button=Button(21,bounce_time=0.07)
 # servo=Servo(19,min_pulse_width=0.0004,max_pulse_width=0.0024)
-angle_servo=AngularServo(19, min_angle=-90, max_angle=90, min_pulse_width=0.0004, max_pulse_width=0.0024)
+angle_blind=AngularServo(19, min_angle=-90, max_angle=90, min_pulse_width=0.0004, max_pulse_width=0.0024)
+angle_camera=AngularServo(23, min_angle=-90, max_angle=90, min_pulse_width=0.0004, max_pulse_width=0.0024)
 red=PWMLED(16)
 green=PWMLED(13)
 blue=PWMLED(26)
@@ -189,7 +190,8 @@ def make_text(text,name="MAN_READ_CALM"):
 living_true=0
 kitchen_true=0
 mainroom_true=0
-automode_true=1
+automode_true=0
+
 listI=[]
 for i in range(0,101):
     listI.append(i)
@@ -205,7 +207,7 @@ def on_connect(client,userdata,flags,rc):
 
 
 def on_message(client,userdata,msg):
-    global living_true,kitchen_true,mainroom_true, thread_state,automode_true
+    global living_true,kitchen_true,mainroom_true, thread_state,automode_true,shade_state
     print(msg.topic)
     mt=msg.topic
     
@@ -263,15 +265,21 @@ def on_message(client,userdata,msg):
         print(f"{msg.topic} {value}")
     
     else:
-        if(msg.topic=="iot/blind" and value=="automode_on"):
+        if(msg.topic=="iot/blind" and value=="automode_on" ):
             automode_true=1
-            # 여기하셔야 됩니다
+            shade_state=True
+            print(shade_state)
+            
+            # if automode_true==1:
 
         elif(msg.topic=="iot/blind" and value=="automode_off"):
             automode_true=0
+            shade_state=False
+            
+            print(shade_state)
         elif(msg.topic=="iot/camera/angle"):
             print("카메라각 제어")
-            angle_servo.angle=float(value)
+            angle_camera.angle=float(value)
             print(f"{msg.topic} {value}")
         elif(msg.topic=="iot/camera/capture" and value=="captured"):
             print("내부카메라 캡쳐 ")
@@ -301,8 +309,11 @@ def on_message(client,userdata,msg):
         elif (automode_true==0 and mt=="iot/blind"):
             if (value in listS):
                 print("블라각 제어")
-                angle_servo.angle=float(value)
+                angle_blind.angle=float(value)
                 print(f"{msg.topic} {value}")
+        elif (automode_true==1 and shade_state==True):
+            shades_thread=threading.Thread(target=analog_sensor_shade,args=())
+            shades_thread.start()
 
 
 
@@ -428,20 +439,20 @@ def readadc(adcnum):
 def analog_sensors():
     
     analog_spi=AnalogSpi()
-    shades_control=ShadesControl() #서보모터의 gpio 핀은 기본 22로 설정되어있음
+    # shades_control=ShadesControl() #서보모터의 gpio 핀은 기본 22로 설정되어있음
     fire_alert=FireAlert()
     i=0
     while True:
         
         pot_value0 = analog_spi.readadc(analog_spi.pot_channel0)
-        pot_value1 = analog_spi.readadc(analog_spi.pot_channel1)
+        # pot_value1 = analog_spi.readadc(analog_spi.pot_channel1)
         pot_value2 = analog_spi.readadc(analog_spi.pot_channel2)
 
         # 불꽃감지
         fire_alert.run(pot_value0)
 
         # 조도센서 블라인드 
-        shades_control.run(pot_value1)
+        # shades_control.run(pot_value1)
 
         # 물높이
         
@@ -458,169 +469,181 @@ def analog_sensors():
         sleep(2)
 
 
+shade_state=True
+def analog_sensor_shade():
+    analog_spi=AnalogSpi()
+    shades_control=ShadesControl() #서보모터의 gpio 핀은 기본 22로 설정되어있음
+    while shade_state:
+        pot_value1 = analog_spi.readadc(analog_spi.pot_channel1)
+        print("조도 값:",pot_value1)
+        
+        shades_control.run(pot_value1)
+        sleep(2)
 
 #센서값을 통한 카톡메세지 전달
 
+def main():
+    t=threading.Thread(target=analog_sensors,args=())
+            
+    t.start()
+    client.connect("192.168.219.103")  #pc주소입력해야함
+    client.loop_start()
+    text=f'''안녕하세요 스마트홈 작동을 시작하겠습니다.
+    '''
+    print(text)
 
-t=threading.Thread(target=analog_sensors,args=())
+    data=make_text(text)
+    res_sound=requests.post(URL,headers=HEADERS,data=data.encode('utf-8'))
+
+    sound=BytesIO(res_sound.content)
+    song=AudioSegment.from_mp3(sound)
+    play(song)
+
+    # button.when_pressed=recognize
+    while True:
+        try:
+            
+            
+            print("시작하겠습니다")
         
-t.start()
-client.connect("192.168.219.105")  #pc주소입력해야함
-client.loop_start()
 
-# button.when_pressed=recognize
-while True:
-    try:
-        
-        # pot_value0_th=threading.Thread(target=readadc,args=(pot_channel0,))
-        # pot_value0_th.start()
-        
-        
-        # pot_value0_th.start()
-        
-        # print(pot_value0)
-        # if pot_value0>650:
-        #     t=threading.Thread(target=bath_water_detect)
-        #     t.start()
-        #     sleep(2)
-        print("시작하겟슴")
-    
-
-    except Exception as e:
-        print(f'에러:{e}')
+        except Exception as e:
+            print(f'에러:{e}')
 
 
-    button.wait_for_press()
-    recognize()
-    if is_success:
-        print('인식결과',result['value'])
-        print(type(result['value']))
+        button.wait_for_press()
+        recognize()
+        if is_success:
+            print('인식결과',result['value'])
+            print(type(result['value']))
 
-        if(result['value']=="창문 열어" or result['value']=="창문 열어줘" or result['value']=="창문 좀 열어" or result['value']=="창문 좀 열어줘"):
-            angle_servo.angle=60
-            sleep(1)
+            if(result['value']=="창문 열어" or result['value']=="창문 열어줘" or result['value']=="창문 좀 열어" or result['value']=="창문 좀 열어줘"):
+                angle_blind.angle=60
+                sleep(1)
+                
+                print("창문열게요")
+                # result['value']="초기화"
+                # print(result['value'])
+                
+            elif(result['value']=="창문 닫아" or result['value']=="창문 닫아줘" or result['value']=="창문 좀 닫아" or result['value']=="창문 좀 닫아줘"):
+                # servo.max()
+                angle_blind.angle=-60
+                sleep(1)
+                
+                print("문 닫을게요")
+            elif(result['value']=="거실 불 켜" or result['value']=="거실 켜" or result['value']=="거실 불" or result['value']=="거실 불 좀 켜"):
+                print("전등 킬게요")
+                red.on()
+                sleep(1)
+            elif(result['value']=="거실 불 꺼" or result['value']=="거실 꺼" or result['value']=="거실 불 좀 꺼"):
+                print("전등 끌게요")
+                red.off()
+                sleep(1)
+
+            elif(result['value']=="주방 불 켜" or result['value']=="주방 켜" or result['value']=="주방 불" or result['value']=="주방 불 좀 켜"):
+                print("전등 킬게요")
+                green.on()
+                sleep(1)
+            elif(result['value']=="주방 불 꺼" or result['value']=="주방 꺼" or result['value']=="주방 불 좀 꺼"):
+                print("전등 끌게요")
+                green.off()
+                sleep(1)
+
+            elif(result['value']=="안방 불 켜" or result['value']=="안방 켜" or result['value']=="안방 불" or result['value']=="안방 불 좀 켜"):
+                print("전등 킬게요")
+                blue.on()
+                sleep(1)
+            elif(result['value']=="안방 불 꺼" or result['value']=="안방 꺼" or result['value']=="안방 불 좀 꺼"):
+                print("전등 끌게요")
+                blue.off()
+                sleep(1)
+
+
+            elif(result['value']=="날씨 알려줘"):
+                text=f'''오늘 날씨는 {weather["description"]} 최저온도는 {round(float(weather["etc"]["temp_min"]-273),1)} 도
+                최고온도는 {round(float(weather["etc"]["temp_max"]-273),1)} 도입니다 
+                또한 습도는 {weather['etc']['humidity']} 입니다. 좋은 하루 되세요
+                '''
+                print(text)
+                
+                data=make_text(text)
+                res_sound=requests.post(URL,headers=HEADERS,data=data.encode('utf-8'))
+
+                sound=BytesIO(res_sound.content)
+                song=AudioSegment.from_mp3(sound)
+                play(song)
+
+            elif(result['value']=="시간 알려줘"):
+                ampm_kr = '오전' if ampm == 'AM' else '오후'
+                print(ampm_kr)
+                if now.hour>12:
+                    time_now=now.hour-12
+                text=f'''현재 시간은 {ampm_kr}  {time_now}시 {now.minute}분입니다.
+                '''
+                print(text)
+                
+                data=make_text(text)
+                res_sound=requests.post(URL,headers=HEADERS,data=data.encode('utf-8'))
+
+                sound=BytesIO(res_sound.content)
+                song=AudioSegment.from_mp3(sound)
+                play(song)
+
+            elif(result['value']=="실내 온도 알려줘"):
+                temparature_c=dhtdevice.temperature
+                text=f'''{temparature_c} 도 입니다
+
+                '''
+                print(text)
+                
+                data=make_text(text)
+                res_sound=requests.post(URL,headers=HEADERS,data=data.encode('utf-8'))
+
+                sound=BytesIO(res_sound.content)
+                song=AudioSegment.from_mp3(sound)
+                play(song)
             
-            print("창문열게요")
-            # result['value']="초기화"
-            # print(result['value'])
+            elif(result['value']=="실내 습도 알려줘"):
+                humidity=dhtdevice.humidity
+                text=f'''{humidity} 퍼센트 입니다
+
+                '''
+                print(text)
+                
+                data=make_text(text)
+                res_sound=requests.post(URL,headers=HEADERS,data=data.encode('utf-8'))
+
+                sound=BytesIO(res_sound.content)
+                song=AudioSegment.from_mp3(sound)
+                play(song)
+                
+
+            elif(result['value']=="종료해"):
+                break
+
+            # elif(result['value']!="창문 열어" or result['value']!="창문 닫아" or result['value']!="전등 켜" or result['value']!="전등 꺼" or result['value']!="날씨 알려줘" or result['value']!="종료해"):
+                # result['value']="초기화"
+            else: 
+                text=f'''죄송합니다 다시 말씀해주세요
+                '''
+                print(text)
+                
+                data=make_text(text)
+                res_sound=requests.post(URL,headers=HEADERS,data=data.encode('utf-8'))
+
+                sound=BytesIO(res_sound.content)
+                song=AudioSegment.from_mp3(sound)
+                play(song)
+
+
+
+            # elif(result['value']=="초기화"):
+            #     continue
+
             
-        elif(result['value']=="창문 닫아" or result['value']=="창문 닫아줘" or result['value']=="창문 좀 닫아" or result['value']=="창문 좀 닫아줘"):
-            # servo.max()
-            angle_servo.angle=-60
-            sleep(1)
-            
-            print("문 닫을게요")
-        elif(result['value']=="거실 불 켜" or result['value']=="거실 켜" or result['value']=="거실 불" or result['value']=="거실 불 좀 켜"):
-            print("전등 킬게요")
-            red.on()
-            sleep(1)
-        elif(result['value']=="거실 불 꺼" or result['value']=="거실 꺼" or result['value']=="거실 불 좀 꺼"):
-            print("전등 끌게요")
-            red.off()
-            sleep(1)
+        else:
+            print("인식실패:",result['value'])
 
-        elif(result['value']=="주방 불 켜" or result['value']=="주방 켜" or result['value']=="주방 불" or result['value']=="주방 불 좀 켜"):
-            print("전등 킬게요")
-            green.on()
-            sleep(1)
-        elif(result['value']=="주방 불 꺼" or result['value']=="주방 꺼" or result['value']=="주방 불 좀 꺼"):
-            print("전등 끌게요")
-            green.off()
-            sleep(1)
+    # 클래스화는 다음에 할게요
 
-        elif(result['value']=="안방 불 켜" or result['value']=="안방 켜" or result['value']=="안방 불" or result['value']=="안방 불 좀 켜"):
-            print("전등 킬게요")
-            blue.on()
-            sleep(1)
-        elif(result['value']=="안방 불 꺼" or result['value']=="안방 꺼" or result['value']=="안방 불 좀 꺼"):
-            print("전등 끌게요")
-            blue.off()
-            sleep(1)
-
-
-        elif(result['value']=="날씨 알려줘"):
-            text=f'''오늘 날씨는 {weather["description"]} 최저온도는 {round(float(weather["etc"]["temp_min"]-273),1)} 도
-            최고온도는 {round(float(weather["etc"]["temp_max"]-273),1)} 도입니다 
-            또한 습도는 {weather['etc']['humidity']} 입니다. 좋은 하루 되세요
-            '''
-            print(text)
-            
-            data=make_text(text)
-            res_sound=requests.post(URL,headers=HEADERS,data=data.encode('utf-8'))
-
-            sound=BytesIO(res_sound.content)
-            song=AudioSegment.from_mp3(sound)
-            play(song)
-
-        elif(result['value']=="시간 알려줘"):
-            ampm_kr = '오전' if ampm == 'AM' else '오후'
-            print(ampm_kr)
-            if now.hour>12:
-                time_now=now.hour-12
-            text=f'''현재 시간은 {ampm_kr}  {time_now}시 {now.minute}분입니다.
-            '''
-            print(text)
-            
-            data=make_text(text)
-            res_sound=requests.post(URL,headers=HEADERS,data=data.encode('utf-8'))
-
-            sound=BytesIO(res_sound.content)
-            song=AudioSegment.from_mp3(sound)
-            play(song)
-
-        elif(result['value']=="실내 온도 알려줘"):
-            temparature_c=dhtdevice.temperature
-            text=f'''{temparature_c} 도 입니다
-
-            '''
-            print(text)
-            
-            data=make_text(text)
-            res_sound=requests.post(URL,headers=HEADERS,data=data.encode('utf-8'))
-
-            sound=BytesIO(res_sound.content)
-            song=AudioSegment.from_mp3(sound)
-            play(song)
-        
-        elif(result['value']=="실내 습도 알려줘"):
-            humidity=dhtdevice.humidity
-            text=f'''{humidity} 퍼센트 입니다
-
-            '''
-            print(text)
-            
-            data=make_text(text)
-            res_sound=requests.post(URL,headers=HEADERS,data=data.encode('utf-8'))
-
-            sound=BytesIO(res_sound.content)
-            song=AudioSegment.from_mp3(sound)
-            play(song)
-            
-
-        elif(result['value']=="종료해"):
-            break
-
-        elif(result['value']!="창문 열어" or result['value']!="창문 닫아" or result['value']!="전등 켜" or result['value']!="전등 꺼" or result['value']!="날씨 알려줘" or result['value']!="종료해"):
-            # result['value']="초기화"
-            
-            text=f'''죄송합니다 다시 말씀해주세요
-            '''
-            print(text)
-            
-            data=make_text(text)
-            res_sound=requests.post(URL,headers=HEADERS,data=data.encode('utf-8'))
-
-            sound=BytesIO(res_sound.content)
-            song=AudioSegment.from_mp3(sound)
-            play(song)
-
-
-
-        # elif(result['value']=="초기화"):
-        #     continue
-
-        
-    else:
-        print("인식실패:",result['value'])
-
-# 클래스화는 다음에 할게요
+main()
