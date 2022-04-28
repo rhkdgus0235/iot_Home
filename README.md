@@ -1,4 +1,6 @@
 # iot_Home
+# homeiot_final.py가 최종파일
+# homeiot.py는 프로토타입
 
 현재 gpio 사용핀 정리 
 

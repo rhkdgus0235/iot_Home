@@ -105,7 +105,7 @@ class FireAlert:
     print("!!!!!!!불꽃감지 알림작동!!!!!!!!")
     i=0
     if i<3:
-      res=send_talk_alert('화재발생!!!!','http://192.168.219.106:8000/mjpeg/?mode=stream')#라파 서버주소
+      res=send_talk_alert('화재발생!!!!','http://192.168.219.104:8000/mjpeg/?mode=stream')#라파 서버주소
       i+=1
     # 라파 주소
     if res.get('result_code')!=0:

@@ -1,4 +1,8 @@
-from re import L
+from send_kakaotalk import key_path
+from bath_water import bath_water_detect
+from voice_systhesize import URL,HEADERS,make_text
+from voice_recognize import *
+from get_weather_seoul import get_weather
 from signal import pause
 from time import sleep
 import requests
@@ -21,18 +25,11 @@ import os
 import cv2
 from AnalogSpi import AnalogSpi
 from FireAlert import FireAlert
-
-# from ShadesControl import ShadesControl
-# from ShadeControl2 import ShadesControl
-
-from ShadesControl import ShadesControl
+from Record import Record
 
 
 
 
-
-
-# 클래스화는 다음에 할게요 
 dhtdevice=adafruit_dht.DHT11(board.D12)
 button=Button(21,bounce_time=0.07)
 # servo=Servo(19,min_pulse_width=0.0004,max_pulse_width=0.0024)
@@ -43,161 +40,10 @@ green=PWMLED(13)
 blue=PWMLED(26)
 now=datetime.now()
 ampm = now.strftime('%p')
-
-
-# fname=start.strftime('./data/%Y%m%d_%H%M%S.mp4')
-# frame_size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-# int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-frame_size = (640,480)
-
-fourcc=cv2.VideoWriter_fourcc(*'mp4v')
-writer=None
+record=Record()
 
 
 
-
-def start_record():
-    global writer, thread_state
-    if writer: return
-    thread_state = True
-    start=datetime.now()
-    fname=start.strftime('./data/%Y%m%d_%H%M%S.mp4')
-    writer=cv2.VideoWriter(fname,fourcc,20.0,frame_size)
-    print('frame_size = ', frame_size)
-
-def stop_record():
-    global writer, thread_state
-    if not writer:return
-
-    writer.release()
-    writer=None
-    print('stop recording')
-
-thread_state = False
-
-def record_thread():
-    cap=cv2.VideoCapture(1)
-    start_record()
-    print("카메라 상태", cap.isOpened())
-
-    while thread_state:
-        retval, frame=cap.read()        
-        if writer:
-            print(retval)
-            writer.write(frame)
-        else:
-            print("writer 없음")
-
-    stop_record()
-    sleep(2)
-    
-
-
-
-def recognize():
-    global is_success,result
-
-    fs=16000
-    seconds=5
-
-
-    myrecording=sd.rec(int(seconds*fs),samplerate=fs,channels=1)
-    sd.wait()
-
-    mem_wav=BytesIO()
-    sf.write(mem_wav,myrecording,fs,format="wav")
-
-    print(mem_wav.tell())
-    audio=mem_wav.seek(0)
-
-    kakao_speech_url = "https://kakaoi-newtone-openapi.kakao.com/v1/recognize"
-
-    rest_api_key='db7d3e117257f54d58bf7347d49b91b9'
-
-    headers={
-        "Content_Type": "applicatioin/octet-stream",
-        "X-DSS-Service": "DICTATION",
-        "Authorization": "KakaoAK " +rest_api_key,
-
-    }
-    # with open('converted.wav','rb') as fp:
-    #     audio=fp.read()
-    #이것만 교체
-    res=requests.post(kakao_speech_url,headers=headers,data=mem_wav)
-
-    print(res.text)
-
-    result_json_string=res.text[
-        res.text.index('{"type":"finalResult"'):res.text.rindex('}')+1
-
-    ]
-    result=json.loads(result_json_string)
-    print(result)
-    print(result['value'])
-
-    is_success=True
-    start=res.text.find('{"type":"finalResult"')
-    end=res.text.rindex('}')+1
-
-    if start==-1:
-        start=res.text.find('{"type":"errorCalled"')
-        is_success=False
-
-    result_json_string=res.text[start:end]
-    result=json.loads(result_json_string)
-    return is_success, result
-
-# 음성인식처리
-
-API_KEY='0333a09d025f1976cbb5177a5f6c9b9a'
-
-def get_weather(city='Seoul'):
-    URL=f'http://api.openweathermap.org/data/2.5/weather?q={city}&APPID={API_KEY}&lang=kr'
-    print(URL)
-
-    weather={}
-
-    res=requests.get(URL)
-    if res.status_code==200:
-        result=res.json()
-        weather['main']=result['weather'][0]['main']
-        weather['description']=result['weather'][0]['description']
-
-        print(result['weather'][0]['description'])
-        icon=result['weather'][0]['icon']
-        weather['icon'] = f'http://openweathermap.org/img/w/{icon}.png' 
-        weather['etc'] = result['main']
-
-    else:
-        print('error',res.status_code)
-
-    return weather
-
-weather = get_weather()
-print(json.dumps(weather, indent=4, ensure_ascii=False))
-weather
-# 날씨처리
-
-
-
-# print(round(float(weather["etc"]["temp_min"]-273),1))
-
-URL = "https://kakaoi-newtone-openapi.kakao.com/v1/synthesize"
-HEADERS={
-
-    "content-Type":"application/xml",
-    "Authorization": "KakaoAK db7d3e117257f54d58bf7347d49b91b9"
-}
-def make_text(text,name="MAN_READ_CALM"):
-    return f"""
-    <speak>
-        <voice name="{name}">{text}</voice>
-    </speak>
-    """
-
-
-
-# 음성합성
 
 living_true=0
 kitchen_true=0
@@ -272,8 +118,6 @@ def on_message(client,userdata,msg):
                 blue.value=float(int(value)/100)
 
 
-
-        # print(f"{float(value)}")  #카메라각도값 제어
         print(f"{msg.topic} {value}")
     
     else:
@@ -301,92 +145,33 @@ def on_message(client,userdata,msg):
             print("내부카메라 캡쳐 ")
             cap=cv2.VideoCapture(1)
     
-    
-
-    
             retval, frame=cap.read()  
-
-            # os.system("fswebcam --device /dev/video1 image.jpeg")
-            cv2.imwrite('messigray.png',frame, params=[cv2.IMWRITE_PNG_COMPRESSION,0])
+            start=datetime.now()
+            fname=start.strftime('./data/%Y%m%d_%H%M%S.png')
+            cv2.imwrite(fname,frame, params=[cv2.IMWRITE_PNG_COMPRESSION,0])
         elif(msg.topic=="iot/camera/record" and value=="on"):
             
             print("내부카메라 녹화")
-            t_record=threading.Thread(target=record_thread,args=())
+            t_record=threading.Thread(target=record.record_thread,args=())
             t_record.start()
             
-            # cv2.imshow('frame',frame)
-
             
         elif (msg.topic=="iot/camera/record" and value=="off"):
             print("내부카메라 녹화종료")
-            # t_record=threading.Thread(target=record_thread,args=(1,))
-            # t_record.start()
-            thread_state = False
+            
+            record.thread_state = False
         elif (automode_true==0 and mt=="iot/blind"):
             if (value in listS):
                 print("블라각 제어")
                 angle_blind.angle=float(value)
                 print(f"{msg.topic} {value}")
-        # elif (automode_true==1 and shade_state==True):
-        #     count=0
-        #     if count==0:
+       
 
-                # shades_thread=threading.Thread(target=analog_sensor_shade,args=())
-                # shades_thread.start()
-                # count+=1
-
-
-
-client=mqtt.Client()
-
-client.on_connect=on_connect
-client.on_message=on_message
 
 
 #mqtt제어
 
 
-key_path='/home/pi/workspace/iot_Home-2/iot_server/access_token.txt'
-
-def send_talk(text,mobile_web_url,web_url=None):
-    if not web_url:
-        web_url=mobile_web_url
-    with open(key_path,'r') as f:
-        token=f.read()
-
-    talk_url = "https://kapi.kakao.com/v2/api/talk/memo/default/send"
-    header={"Authorization":f"Bearer {token}"}
-
-    # text_template={
-    #     'object_type':'text',
-    #     'text':text,
-    #     'image_url': "http://mud-kage.kakao.co.kr/dn/NTmhS/btqfEUdFAUf/FjKzkZsnoeE4o19klTOVI1/openlink_640x640s.jpg",
-    #     'link':{
-    #         'web_url':web_url,
-    #         'mobile_web_url':mobile_web_url
-    #         }
-    # }
-    text_template={
-        'object_type':'feed',
-        "content": {
-            "title": "즐거운 시간",
-            "description": text, 
-            "image_url": "https://c.pxhere.com/photos/02/7b/hammocks_trees_summer_relaxation_resort_relax_holiday_tranquil-947005.jpg!d", "image_width": 640,
-            "image_height": 640, 
-            "link": {
-            "web_url": web_url,
-            "mobile_web_url": mobile_web_url,
-            "android_execution_params": "contentId=100", "ios_execution_params": "contentId=100"
-        } 
-        }
-        
-    }
-
-
-    print(text_template)
-    payload={'template_object':json.dumps(text_template)}
-    res=requests.post(talk_url,data=payload,headers=header)
-    return res.json()
 
 def send_talk_alert(text,mobile_web_url,web_url=None):
     if not web_url:
@@ -411,32 +196,8 @@ def send_talk_alert(text,mobile_web_url,web_url=None):
     res=requests.post(talk_url,data=payload,headers=header)
     return res.json()
 
-def bath_water_detect():
-    # red.on()
-    # res=send_talk('침입 발생','http://192.168.219.105:8000/mjpeg/?mode=stream')
-    res=send_talk('목욕 물이 채워졌습니다. 좋은 시간 되세요.','http://www.youtube.com/watch?v=VBFmh3nCZbc')#카카오톡 개발자 사이트에서 youtube.com 등록
-    # 라파 주소
-    if res.get('result_code')!=0:
-        print("전송 실패",res['msg'],res['code'])
 
 
-
-
-
-#물높이 센서(spi)
-
-# def sensor_data():
-    
-#     while True:
-        
-#         pot_value0 = readadc(pot_channel0)
-#         print("수위값:", pot_value0)
-#         if pot_value0>680:
-#             bath_water_detect()
-#             sleep(295)
-            
-            
-#         sleep(5)
 
 class ShadesControl:
   def __init__(self):
@@ -444,9 +205,6 @@ class ShadesControl:
     self.dc = 7.5
     angle_blind.value=self.dc/100
     
-    
-    
-
 
   def is_night(self):
     hour=datetime.now().hour
@@ -531,26 +289,10 @@ def analog_sensors():
             sleep(5)
             i+=1
         sleep(2)
-# while True:
-#     try:
 
-#         t=threading.Thread(target=analog_sensors,args=())
-#         t.start()
-        
-#         client.connect("192.168.219.104")  #pc주소입력해야함
-#         client.loop_start()
     
 
-#     except Exception as e:
-#         print(f'에러:{e}')
 
-
-#     button.wait_for_press()
-#     recognize()
-#     if is_success:
-#         print('인식결과',result['value'])
-#         print(type(result['value']))
-                 
 
 
 shade_state=True
@@ -567,6 +309,15 @@ def analog_sensor_shade():
 #센서값을 통한 카톡메세지 전달
 
 def main():
+    weather = get_weather()
+    print(json.dumps(weather, indent=4, ensure_ascii=False))
+    weather
+
+    client=mqtt.Client()
+
+    client.on_connect=on_connect
+    client.on_message=on_message
+
     t=threading.Thread(target=analog_sensors,args=())
             
     t.start()
@@ -583,20 +334,19 @@ def main():
     song=AudioSegment.from_mp3(sound)
     play(song)
 
-    # button.when_pressed=recognize
     while True:
         try:
             
-            
             print("시작하겠습니다")
         
-
         except Exception as e:
             print(f'에러:{e}')
 
 
         button.wait_for_press()
-        recognize()
+        
+        is_success,result=recognize()
+        
         if is_success:
             print('인식결과',result['value'])
             print(type(result['value']))
@@ -606,11 +356,10 @@ def main():
                 sleep(1)
                 
                 print("창문열게요")
-                # result['value']="초기화"
-                # print(result['value'])
+                
                 
             elif(result['value']=="창문 닫아" or result['value']=="창문 닫아줘" or result['value']=="창문 좀 닫아" or result['value']=="창문 좀 닫아줘"):
-                # servo.max()
+                
                 angle_blind.angle=-60
                 sleep(1)
                 
@@ -705,8 +454,6 @@ def main():
             elif(result['value']=="종료해"):
                 break
 
-            # elif(result['value']!="창문 열어" or result['value']!="창문 닫아" or result['value']!="전등 켜" or result['value']!="전등 꺼" or result['value']!="날씨 알려줘" or result['value']!="종료해"):
-                # result['value']="초기화"
             else: 
                 text=f'''죄송합니다 다시 말씀해주세요
                 '''
@@ -719,15 +466,9 @@ def main():
                 song=AudioSegment.from_mp3(sound)
                 play(song)
 
-
-
-            # elif(result['value']=="초기화"):
-            #     continue
-
             
         else:
             print("인식실패:",result['value'])
 
-    # 클래스화는 다음에 할게요
 
 main()
